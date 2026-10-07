@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment files
+.env
+.env*.local
+*/.env
+*/.env*.local
+
+# Firebase keys
+*.json
+!package.json
+!tsconfig.json
+!app.json
+
+# Builds & logs
+dist/
+build/
+*.log
+npm-debug.*
+yarn-debug.*
+
+# Expo
+.expo/
+web-build/
+
+# OS files
+.DS_Store
+Thumbs.db
