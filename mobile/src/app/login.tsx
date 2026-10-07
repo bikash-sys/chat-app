@@ -12,7 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { signInWithPhoneNumber, RecaptchaVerifier } from 'firebase/auth';
+import { PhoneAuthProvider, ApplicationVerifier } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 
@@ -20,11 +20,11 @@ export default function LoginScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const { setConfirmationResult, setPhoneForOtp, user, userProfile } = useAuth();
+  const { setVerificationId, setPhoneForOtp, user, userProfile } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    // If user already logged in with profile name set, go to home
+    // If user is already authenticated with completed profile name, navigate to home
     if (user && userProfile?.name) {
       router.replace('/');
     }
@@ -35,7 +35,9 @@ export default function LoginScreen() {
     const formattedPhone = phoneNumber.trim();
 
     if (!formattedPhone || !formattedPhone.startsWith('+') || formattedPhone.length < 10) {
-      setErrorMessage('Please enter a valid phone number in international format starting with + (e.g. +16505553434 or +919999999999).');
+      setErrorMessage(
+        'Please enter a valid phone number in international format starting with + (e.g. +16505553434 or +919999999999).'
+      );
       return;
     }
 
@@ -43,31 +45,33 @@ export default function LoginScreen() {
     try {
       setPhoneForOtp(formattedPhone);
 
-      // Setup reCAPTCHA verifier for web / RN container
-      let appVerifier: any;
-      if (Platform.OS === 'web') {
-        if (!(window as any).recaptchaVerifier) {
-          (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            size: 'invisible',
-            callback: () => {},
-          });
-        }
-        appVerifier = (window as any).recaptchaVerifier;
-      } else {
-        // Fallback or native verifier
-        appVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-          size: 'invisible',
-        });
-      }
+      // React Native compatible application verifier without DOM/window/document
+      const appVerifier: ApplicationVerifier = {
+        type: 'recaptcha',
+        verify: async () => '',
+        _reset: () => {},
+      } as any;
 
-      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-      setConfirmationResult(confirmation);
+      const phoneProvider = new PhoneAuthProvider(auth);
+      const verificationId = await phoneProvider.verifyPhoneNumber(formattedPhone, appVerifier);
+
+      setVerificationId(verificationId);
       setLoading(false);
       router.push('/otp');
     } catch (error: any) {
       console.error('[Login Error]:', error);
       setLoading(false);
-      const msg = error.message || 'Failed to send OTP code. Check your phone number and network.';
+
+      let msg = error.message || 'Failed to send OTP code.';
+      if (error.code === 'auth/operation-not-allowed') {
+        msg =
+          'Phone authentication is not enabled or SMS region is restricted for this Firebase project. Ensure "Phone" is enabled in Firebase Console > Authentication > Sign-in method, and add test phone numbers under "Phone numbers for testing".';
+      } else if (error.code === 'auth/invalid-phone-number') {
+        msg = 'The phone number format is invalid. Please verify the country code and number.';
+      } else if (error.code === 'auth/quota-exceeded') {
+        msg = 'SMS quota exceeded. Please use Firebase test phone numbers in Firebase Console.';
+      }
+
       setErrorMessage(msg);
       Alert.alert('Authentication Error', msg);
     }
@@ -80,7 +84,9 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.card}>
           <Text style={styles.title}>Mobile Chat</Text>
-          <Text style={styles.subtitle}>Enter your phone number with country code to receive an OTP code</Text>
+          <Text style={styles.subtitle}>
+            Enter your phone number with country code to receive an OTP code
+          </Text>
 
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
@@ -106,9 +112,6 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
         </View>
-
-        {/* reCAPTCHA container element */}
-        {Platform.OS === 'web' && <View id="recaptcha-container" />}
       </ScrollView>
     </KeyboardAvoidingView>
   );

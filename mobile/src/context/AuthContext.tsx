@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthStateChanged, User, signOut as firebaseSignOut, ConfirmationResult } from 'firebase/auth';
+import { onAuthStateChanged, User, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { UserProfile } from '../types';
 import { syncUserProfile, fetchCurrentUser } from '../services/api';
@@ -9,8 +9,8 @@ interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
-  confirmationResult: ConfirmationResult | null;
-  setConfirmationResult: (result: ConfirmationResult | null) => void;
+  verificationId: string | null;
+  setVerificationId: (id: string | null) => void;
   phoneForOtp: string;
   setPhoneForOtp: (phone: string) => void;
   refreshUserProfile: () => Promise<UserProfile | null>;
@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [verificationId, setVerificationId] = useState<string | null>(null);
   const [phoneForOtp, setPhoneForOtp] = useState<string>('');
 
   const refreshUserProfile = async (): Promise<UserProfile | null> => {
@@ -72,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await firebaseSignOut(auth);
     setUser(null);
     setUserProfile(null);
-    setConfirmationResult(null);
+    setVerificationId(null);
   };
 
   return (
@@ -81,8 +81,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         userProfile,
         loading,
-        confirmationResult,
-        setConfirmationResult,
+        verificationId,
+        setVerificationId,
         phoneForOtp,
         setPhoneForOtp,
         refreshUserProfile,

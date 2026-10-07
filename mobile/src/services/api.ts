@@ -6,14 +6,10 @@ const getAuthToken = async (): Promise<string | null> => {
   const currentUser = auth.currentUser;
   if (currentUser) {
     try {
-      return await currentUser.getIdToken();
+      return await currentUser.getIdToken(true);
     } catch (e) {
-      console.error('[API] Error getting ID token:', e);
+      console.error('[API] Error getting fresh ID token:', e);
     }
-  }
-  // Fallback for development if current user is mock dev user
-  if (__DEV__ && currentUser?.uid) {
-    return `dev-token-${currentUser.uid}`;
   }
   return null;
 };

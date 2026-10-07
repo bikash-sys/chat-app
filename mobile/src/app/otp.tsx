@@ -12,6 +12,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { PhoneAuthProvider, signInWithCredential } from 'firebase/auth';
+import { auth } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { syncUserProfile } from '../services/api';
 import { initSocket } from '../services/socket';
@@ -20,7 +22,7 @@ export default function OtpScreen() {
   const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const { confirmationResult, phoneForOtp, setUserProfile } = useAuth();
+  const { verificationId, phoneForOtp, setUserProfile } = useAuth();
   const router = useRouter();
 
   const handleVerifyOTP = async () => {
@@ -32,17 +34,22 @@ export default function OtpScreen() {
       return;
     }
 
-    if (!confirmationResult) {
-      setErrorMessage('No OTP verification session found. Please try logging in again.');
+    if (!verificationId) {
+      setErrorMessage('No active verification session found. Please try logging in again.');
       return;
     }
 
     setLoading(true);
     try {
-      const userCredential = await confirmationResult.confirm(code);
+      // Build PhoneAuthCredential from verificationId and user entered code
+      const credential = PhoneAuthProvider.credential(verificationId, code);
+      const userCredential = await signInWithCredential(auth, credential);
       const firebaseUser = userCredential.user;
 
-      // Sync MongoDB User
+      // Explicitly obtain fresh Firebase ID token
+      await firebaseUser.getIdToken(true);
+
+      // Sync user with MongoDB backend
       const mongoProfile = await syncUserProfile(undefined, firebaseUser.phoneNumber || phoneForOtp);
       setUserProfile(mongoProfile);
 
@@ -59,7 +66,14 @@ export default function OtpScreen() {
     } catch (error: any) {
       console.error('[OTP Verification Error]:', error);
       setLoading(false);
-      const msg = error.message || 'Invalid OTP code. Please check and try again.';
+
+      let msg = error.message || 'Invalid OTP code. Please check and try again.';
+      if (error.code === 'auth/invalid-verification-code') {
+        msg = 'Incorrect verification code. Please check the code and try again.';
+      } else if (error.code === 'auth/code-expired' || error.code === 'auth/session-expired') {
+        msg = 'Verification code has expired. Please go back and request a new code.';
+      }
+
       setErrorMessage(msg);
       Alert.alert('Verification Failed', msg);
     }

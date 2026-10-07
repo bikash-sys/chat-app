@@ -17,13 +17,9 @@ export const initSocket = async (): Promise<Socket | null> => {
 
   let token: string | null = null;
   try {
-    token = await currentUser.getIdToken();
+    token = await currentUser.getIdToken(true);
   } catch (e) {
-    console.error('[Socket] Failed to get ID token:', e);
-  }
-
-  if (!token && __DEV__) {
-    token = `dev-token-${currentUser.uid}`;
+    console.error('[Socket] Failed to get fresh ID token:', e);
   }
 
   if (socket && socket.connected) {

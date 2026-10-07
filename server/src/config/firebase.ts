@@ -11,8 +11,10 @@ export const initFirebaseAdmin = (): void => {
   }
 
   try {
-    // Check if JSON key file path is provided in environment variables
-    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+    // Check if JSON key file path is provided or exists in current directory
+    const serviceAccountPath =
+      process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
+      path.resolve(process.cwd(), 'firebase-service-account.json');
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
     if (serviceAccountJson) {
@@ -30,7 +32,7 @@ export const initFirebaseAdmin = (): void => {
       admin.initializeApp({
         credential: admin.credential.cert(parsedKey),
       });
-      console.log('[Firebase Admin] Initialized with FIREBASE_SERVICE_ACCOUNT_PATH');
+      console.log('[Firebase Admin] Initialized with service account file:', serviceAccountPath);
       firebaseInitialized = true;
       return;
     }
@@ -73,23 +75,5 @@ export const verifyFirebaseToken = async (idToken: string): Promise<admin.auth.D
   } catch (err) {
     console.error('[Firebase Auth] Verification failed:', (err as Error).message);
   }
-
-  // Fallback for development/testing if token format is dev-uid
-  if (process.env.NODE_ENV !== 'production' && idToken.startsWith('dev-token-')) {
-    const uid = idToken.replace('dev-token-', '');
-    return {
-      iss: 'https://securetoken.google.com/dev',
-      uid,
-      aud: 'dev',
-      auth_time: Math.floor(Date.now() / 1000),
-      user_id: uid,
-      sub: uid,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 3600,
-      email_verified: false,
-      firebase: { identities: {}, sign_in_provider: 'custom' },
-    } as unknown as admin.auth.DecodedIdToken;
-  }
-
   return null;
 };
